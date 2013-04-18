@@ -22,7 +22,11 @@ node_state = @lb.get_node(@opts[:lb], @opts[:node])[:body]["node"]["condition"]
 puts "Current State: #{node_state}"
 
 def update_state(new_state)
-  @lb.update_node(@opts[:lb], @opts[:node], options = { :condition => "#{new_state}" })
+  begin
+    @lb.update_node(@opts[:lb], @opts[:node], options = { :condition => "#{new_state}" })
+  rescue Exception => ex
+    puts ex.response_data
+  end
 end
 
 if @opts[:state]
