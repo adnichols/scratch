@@ -1,0 +1,83 @@
+#!/usr/bin/env ruby
+#
+# A tmux / ssh manager
+#
+
+require 'optparse'
+
+@options = {}
+
+@agent_file = "#{ENV['HOME']}/.sc_agent_info"
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: sc [options] [hostname]"
+
+  @options[:name] = "prod"
+
+  opts.on("-f", "--fix", "Output vars to fix up SSH in current shell") do |f|
+    @options[:fix] = true
+  end
+
+  opts.on("-g", "--grab", "Grab SSH vars") do |g|
+    @options[:grab] = true
+  end
+
+  opts.on("-a", "--attach", "Attach to existing tmux session") do |a|
+    @options[:attach] = true
+  end
+
+  opts.on("-c", "--create", "Create a new tmux session") do |c|
+    @options[:create] = true
+  end
+
+  opts.on("-n", "--name", "Name for the tmux session") do |n|
+    @options[:name] = n
+  end
+
+  opts.on("-h", "--help", "Get help") do |h|
+    puts opts
+    exit
+  end
+end.parse!
+
+def grab_ssh_vars()
+  File.unlink(@agent_file) if File.exist?(@agent_file)
+  f = File.new(@agent_file, "w")
+
+  %w(SSH_CLIENT SSH_TTY SSH_AUTH_SOCK SSH_CONNECTION).each do |var|
+    f.write("#{var}=\"#{ENV[var]}\"\n")
+  end
+  f.close
+end
+
+def fix_ssh()
+  puts File.read(@agent_file)
+end
+
+def sc_ssh(host)
+  which_ssh = %x[which ssh].chomp
+  display_host = /(.+@)?(([0-9]+\.){3}[0-9]+|([^.]+))/.match(host)[2]
+  exec("tmux new-window -n #{display_host} \"echo 'Using: #{which_ssh}' ; . #{@agent_file} ; ssh -A #{host}\"")
+end
+
+def create_tmux()
+  grab_ssh_vars
+  exec("tmux -L #{@options[:name]}")
+end
+
+def attach_tmux()
+  grab_ssh_vars
+  exec("tmux -L #{@options[:name]} attach")
+end
+
+if @options[:create]
+  create_tmux
+elsif @options[:attach]
+  attach_tmux
+elsif @options[:grab]
+  grab_ssh_vars
+elsif @options[:fix]
+  fix_ssh
+elsif ARGV[0]
+  sc_ssh(ARGV[0])
+end
